@@ -33,6 +33,9 @@ Please see the [wiki.](https://github.com/alandtse/alexa_media_player/wiki/Confi
 
 Please see the [wiki](https://github.com/alandtse/alexa_media_player/wiki)
 
+This fork's experimental [incoming announcement investigation](ANNOUNCEMENT_RESEARCH.md)
+documents its notification parser changes and the remaining live-delivery tests.
+
 # Changelog
 
 Please reference the [release history](https://github.com/alandtse/alexa_media_player/releases).

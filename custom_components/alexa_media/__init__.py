@@ -114,6 +114,11 @@ from .helpers import (
 )
 from .metrics import AlexaMetrics, get_metrics
 from .notify import async_unload_entry as notify_async_unload_entry
+from .push import (
+    NotificationToastReceiver,
+    iter_rendering_updates,
+    log_push_diagnostics,
+)
 from .runtime_data import AlexaRuntimeData
 from .services import AlexaMediaServices
 
@@ -2438,8 +2443,13 @@ async def setup_alexa(hass, config_entry, login_obj: AlexaLogin):
         This allows push notifications from Alexa to update last_called and media state.
         """
 
+        log_push_diagnostics(message_obj)
         coordinator = hass.data[DATA_ALEXAMEDIA]["accounts"][email].get("coordinator")
         account = hass.data[DATA_ALEXAMEDIA]["accounts"][email]
+        toast_receiver = account.get("notification_toast_receiver")
+        if toast_receiver is None:
+            toast_receiver = NotificationToastReceiver(config_entry.entry_id)
+            account["notification_toast_receiver"] = toast_receiver
 
         def _now_ms() -> int:
             return int(time.time() * 1000)
@@ -2549,37 +2559,15 @@ async def setup_alexa(hass, config_entry, login_obj: AlexaLogin):
         # ---------------------------------------------------------------------
         # Main http2push parsing / dispatch
         # ---------------------------------------------------------------------
-        updates = (
-            message_obj.get("directive", {})
-            .get("payload", {})
-            .get("renderingUpdates", [])
-        )
         existing_serials = set(_existing_serials(hass, login_obj))
         existing_serials |= _entity_backed_serials(account)
-        for item in updates:
-            try:
-                resource = loads(item.get("resourceMetadata", ""))
-            except JSONDecodeError:
+        for update in iter_rendering_updates(message_obj):
+            if toast_receiver.async_receive(hass, update):
+                account["last_push_activity"] = time.time()
                 continue
-
-            command = (
-                resource["command"]
-                if isinstance(resource, dict) and "command" in resource
-                else None
-            )
-            try:
-                json_payload = (
-                    loads(resource["payload"])
-                    if isinstance(resource, dict) and "payload" in resource
-                    else None
-                )
-            except (JSONDecodeError, TypeError):
-                _LOGGER.debug(
-                    "%s: Skipping malformed push payload for command %s",
-                    hide_email(email),
-                    command,
-                )
-                continue
+            resource = update.metadata
+            command = update.command
+            json_payload = update.payload
             seen_commands = hass.data[DATA_ALEXAMEDIA]["accounts"][email][
                 "http2_commands"
             ]
