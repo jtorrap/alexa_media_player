@@ -3,7 +3,7 @@
 This branch investigates receiving ordinary announcements initiated by an Echo
 or Alexa app. Sending announcements is already supported by upstream AMP.
 **This branch does not yet establish live announcement reception or speech-start
-timing. It has not been deployed to a live Home Assistant instance.**
+timing. The receive patch has undergone the bounded live trial documented below.**
 
 ## What the source establishes
 
@@ -137,3 +137,33 @@ Local validation on 2026-10-15: 255 tests passed using Python 3.13.11 and the
 repository's locked Home Assistant 2025.4.4 test dependencies. All pre-commit
 hooks passed, including formatting, import sorting, Bandit and spelling checks.
 The installed live HA version was not changed or used for this test run.
+
+## Bounded live result — 2026-10-15
+
+The three receive-path hunks and new `push.py` were ported onto the exact
+installed AMP 5.16.1 source, keeping alexapy 1.30.1 and all other component
+files/dependencies unchanged. The full dev component was not installed.
+Candidate and final Core checks passed on HA 2026.9.2. A Core restart was
+necessary because reloading the config entry retains Python's cached module.
+
+One Kitchen-targeted native Alexa+ web announcement was submitted at
+22:31:52 UTC and acknowledged with "Announcing to your device". Its audible
+playback was not separately observed in this trial.
+
+The pre-parser capture observed eight `Alexa.Mobile.Push / RenderUpdate`
+messages: six `PUSH_AUDIO_PLAYER_STATE` and two `NotifyNowPlayingUpdated`.
+Three arrived before the request and five afterward, demonstrating reception
+across the test window. The first post-request directive arrived 131 seconds
+after submission. None contained a toast resource, notification-ID field
+or recognized announcement marker. The active HA toast listener received zero
+events. No incoming announcement text was available to validate.
+
+This is a negative result for this native web trial on the existing AMP AVS
+connection. It does not rule out a different result for a spoken/mobile-app
+source, a separate mobile communications subscription, or the untested web
+notification inbox. Parser normalization alone did not provide announcement
+access in this test.
+
+The diagnostic overlay remains installed with its logger restored to INFO.
+The listener/capture were stopped; HA is healthy and configuration checks pass.
+No TV action or production announcement automation was enabled.
